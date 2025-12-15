@@ -1,13 +1,11 @@
 import SwiftUI
 
-/// Root view of the app. Shows the processed camera feed and color selection bar.
 struct ContentView: View {
-    /// Shared model that manages camera, color processing and user selection.
     @StateObject private var model = ColorDetectorModel()
+    @State private var showInfo = false
     
     var body: some View {
         ZStack {
-            // Background: processed camera frame (highlighted colors + darker background).
             if let frame = model.processedFrame {
                 GeometryReader { geo in
                     Image(decorative: frame, scale: 1.0, orientation: .up)
@@ -18,58 +16,90 @@ struct ContentView: View {
                 }
                 .ignoresSafeArea()
             } else {
-                // Fallback while no frame is available yet.
                 Color.black.ignoresSafeArea()
             }
             
-            // Foreground UI layered on top of the camera.
+            // Top info bulb
+            VStack {
+                HStack {
+                    Spacer()
+                    Button {
+                        showInfo = true
+                    } label: {
+                        Image(systemName: "lightbulb")
+                            .font(.title2)
+                            .padding(10)
+                            .background(Circle().fill(Color.black.opacity(0.55)))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.trailing, 16)
+                    .padding(.top, 12)
+                }
+                Spacer()
+            }
+            
+            // Bottom controls
             VStack {
                 Spacer()
-                
-                // Bar with color selection buttons at the bottom of the screen.
-                colorSelectionBar
+                bottomBar
             }
+        }
+        .sheet(isPresented: $showInfo) {
+            InfoSheet()
         }
     }
     
-    /// Horizontal bar of buttons that lets the user choose which colors to track.
-    private var colorSelectionBar: some View {
-        HStack(spacing: 12) {
-            ForEach(TrackedColor.allCases) { tracked in
-                let isSelected = model.selectedColors.contains(tracked)
+    private var bottomBar: some View {
+        HStack(spacing: 14) {
+            // D / P / T / 4 buttons
+            ForEach(VisionMode.allCases) { mode in
+                let isSelected = model.selectedMode == mode
                 
                 Button {
-                    // Toggle this color in the model (max 2 active at once).
-                    model.toggleColor(tracked)
+                    model.selectMode(mode)
                 } label: {
-                    Text(tracked.displayName)
-                        .font(.headline)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        // Filled capsule indicates selection; darker background when inactive.
+                    Text(mode.symbol)
+                        .font(.system(size: 18, weight: .bold))
+                        .frame(width: 44, height: 44)
                         .background(
-                            Capsule()
-                                .fill(isSelected ? tracked.color : Color.black.opacity(0.6))
+                            Circle().fill(isSelected ? Color.white : Color.black.opacity(0.6))
                         )
-                        .foregroundColor(.white)
-                        // Stroke keeps button shape visible against bright backgrounds.
-                        .overlay(
-                            Capsule()
-                                .stroke(tracked.color, lineWidth: isSelected ? 2 : 1)
-                        )
-                        // Slight scale animation to emphasize selected colors.
-                        .scaleEffect(isSelected ? 1.1 : 1.0)
-                        .animation(
-                            .spring(response: 0.25, dampingFraction: 0.7),
-                            value: isSelected
-                        )
+                        .foregroundColor(isSelected ? .black : .white)
                 }
             }
+            
+            // Black & White toggle next to buttons
+            Toggle(isOn: $model.isGrayscaleEnabled) {
+                Image(systemName: "circle.lefthalf.filled")
+                    .foregroundColor(.white)
+            }
+            .labelsHidden()
+            .toggleStyle(SwitchToggleStyle(tint: .white))
         }
         .padding(.horizontal, 16)
-        .padding(.bottom, 30)
+        .padding(.bottom, 28)
+    }
+}
+
+private struct InfoSheet: View {
+    var body: some View {
+        NavigationView {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(VisionMode.allCases) { mode in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(mode.symbol) — \(mode.title)")
+                            .font(.headline)
+                        Text(mode.description)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Vision modes")
+        }
     }
 }
 
